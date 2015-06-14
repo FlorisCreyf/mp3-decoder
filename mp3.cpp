@@ -25,24 +25,22 @@ void mp3::init_header_params(unsigned char *buffer)
 			set_mpeg_version();
 			set_layer(buffer[1]);
 			set_crc();
-			set_channel_mode(buffer);
 			set_info();
 			set_emphasis(buffer);
-			set_mode_extension(buffer);
 			set_sampling_rate();
 			set_tables();
 
 			mono = channel_mode == 3;
 			init = false;
 		}
-
+		
+		set_channel_mode(buffer);
+		set_mode_extension(buffer);
 		set_padding();
 		set_bit_rate(buffer);
 		set_frame_size();
-	} else {
-		if (buffer[0] != 0xFF)
-			valid = false;
-	}
+	} else
+		valid = false;
 }
 
 /**
@@ -56,17 +54,21 @@ void mp3::init_frame_params(unsigned char *buffer)
 	for (int gr = 0; gr < 2; gr++) {
 		for (int ch = 0; ch < (mono ? 1 : 2); ch++)
 			requantize(gr, ch);
-
-		if (!mono && mode_extension[0] != 0)
+		
+		if (channel_mode == 1 && mode_extension[0])
 			ms_stereo(gr);
 
 		for (int ch = 0; ch < (mono ? 1 : 2); ch++) {
-			reorder(gr, ch);
-			alias_reduction(gr, ch);
+			if (block_type[gr][ch] == 2 || mixed_block_flag[gr][ch])
+				reorder(gr, ch);
+			else
+				alias_reduction(gr, ch);
+			
 			imdct(gr, ch);
 			synth_filterbank(gr, ch);
 		}
 	}
+	interleave();
 }
 
 mp3::mp3(unsigned char *buffer)
@@ -206,16 +208,22 @@ inline void mp3::set_tables()
 {
 	switch (sampling_rate) {
 		case 32000:
-			band_index.short_win = t_band_index.short_32;
-			band_index.long_win = t_band_index.long_32;
+			band_index.short_win = band_index_table.short_32;
+			band_width.short_win = band_width_table.short_32;
+			band_index.long_win = band_index_table.long_32;
+			band_width.long_win = band_width_table.long_32;
 			break;
 		case 44100:
-			band_index.short_win = &t_band_index.short_44[0];
-			band_index.long_win = &t_band_index.long_44[0];
+			band_index.short_win = band_index_table.short_44;
+			band_width.short_win = band_width_table.short_44;
+			band_index.long_win = band_index_table.long_44;
+			band_width.long_win = band_width_table.long_44;
 			break;
 		case 48000:
-			band_index.short_win = t_band_index.short_48;
-			band_index.long_win = t_band_index.long_48;
+			band_index.short_win = band_index_table.short_48;
+			band_width.short_win = band_width_table.short_48;
+			band_index.long_win = band_index_table.long_48;
+			band_width.long_win = band_width_table.long_48;
 			break;
 	}
 }
@@ -252,14 +260,7 @@ unsigned mp3::get_channel_mode()
 /** Applies only to joint stereo. */
 inline void mp3::set_mode_extension(unsigned char *buffer)
 {
-	if (layer == 1 || layer == 2) {
-		/* This is different from layer 3.
-		 * A range of bands is determined instead. */
-		unsigned char index = buffer[3] << 2;
-		index = index >> 6;
-		mode_extension[0] = 4 + index * 4;
-		mode_extension[1] = 31;
-	} else {
+	if (layer == 3) {
 		mode_extension[0] = buffer[3] & 0x20;
 		mode_extension[1] = buffer[3] & 0x10;
 	}
@@ -301,8 +302,10 @@ inline void mp3::set_frame_size()
 	unsigned int samples_per_frame;
 	switch (layer) {
 		case 3:
-			if (mpeg_version == 1) samples_per_frame = 1152;
-			else samples_per_frame = 576;
+			if (mpeg_version == 1)
+				samples_per_frame = 1152;
+			else
+				samples_per_frame = 576;
 			break;
 		case 2:
 			samples_per_frame = 1152;
@@ -331,7 +334,6 @@ inline void mp3::set_side_info(unsigned char *buffer)
 	int count = 0;
 
 	/* Number of bytes the main data ends before the next frame header. */
-	prev_main_data_begin = main_data_begin;
 	main_data_begin = (int)get_bits_inc(buffer, &count, 9);
 
 	/* Skip private bits. Not necessary. */
@@ -340,10 +342,11 @@ inline void mp3::set_side_info(unsigned char *buffer)
 	for (int ch = 0; ch < (mono ? 1 : 2); ch++)
 		for (int scfsi_band = 0; scfsi_band < 4; scfsi_band++)
 			/* - Scale factor selection information.
-			 * - If scfsi[scfsi_band] == 1 then scale factors for the first
-			 *   granule are also used for the second granule.
+			 * - If scfsi[scfsi_band] == 1, then scale factors for the first
+			 *   granule are reused in the second granule.
+			 * - If scfsi[scfsi_band] == 0, then each granule has its own scaling factors.
 			 * - scfsi_band indicates what group of scaling factors are reused. */
-			scfsi[ch][scfsi_band] = (int)get_bits_inc(buffer, &count, 1);
+			scfsi[ch][scfsi_band] = get_bits_inc(buffer, &count, 1) != 0;
 
 	for (int gr = 0; gr < 2; gr++)
 		for (int ch = 0; ch < (mono ? 1 : 2); ch++) {
@@ -366,10 +369,10 @@ inline void mp3::set_side_info(unsigned char *buffer)
 
 			if (window_switching[gr][ch]) {
 				/* The window type for the granule.
-				 * 0: reserved (long block)
-				 * 1: start block (long block)
-				 * 2: 3 short windows (short block)
-				 * 3: end block (long block) */
+				 * 0: reserved
+				 * 1: start block
+				 * 2: 3 short windows
+				 * 3: end block */
 				block_type[gr][ch] = (int)get_bits_inc(buffer, &count, 2);
 				/* Number of scale factor bands before window switching. */
 				mixed_block_flag[gr][ch] = get_bits_inc(buffer, &count, 1) == 1;
@@ -383,7 +386,8 @@ inline void mp3::set_side_info(unsigned char *buffer)
 
 				/* These are set by default if window_switching. */
 				region0_count[gr][ch] = block_type[gr][ch] == 2 ? 8 : 7;
-				region1_count[gr][ch] = -1; /* No third region. */
+				/* No third region. */
+				region1_count[gr][ch] = 20 - region0_count[gr][ch];
 
 				for (int region = 0; region < 2; region++)
 					/* Huffman table number for a big region. */
@@ -408,7 +412,7 @@ inline void mp3::set_side_info(unsigned char *buffer)
 			/* If set, add values from a table to the scaling factors. */
 			preflag[gr][ch] = (int)get_bits_inc(buffer, &count, 1);
 			/* Determines the step size. */
-			scalefac_scale[gr][ch] = (int)get_bits_inc(buffer, &count, 1) == 0 ? SQRT2 : 2;
+			scalefac_scale[gr][ch] = (int)get_bits_inc(buffer, &count, 1);
 			/* Table that determines which count1 table is used. */
 			count1table_select[gr][ch] = (int)get_bits_inc(buffer, &count, 1);
 		}
@@ -417,7 +421,7 @@ inline void mp3::set_side_info(unsigned char *buffer)
 /**
  * Due to the Huffman bits' varying length the main_data isn't aligned with the
  * frames. Unpacks the scaling factors and quantized samples.
- * @param buffer - A buffer that points to the the first byte of the frame header.
+ * @param buffer A buffer that points to the the first byte of the frame header.
  */
 inline void mp3::set_main_data(unsigned char *buffer)
 {
@@ -427,20 +431,20 @@ inline void mp3::set_main_data(unsigned char *buffer)
 		constant += 2;
 
 	/* Let's put the main data in a separate buffer so that side info and header
-	 * don't interfere. The main_data_begin may be larger than the previous
+	 * don't interfere. The main_data_begin may be larger than the previous frame
 	 * and doesn't include the size of side info and headers. */
 	unsigned char *main_data;
 	if (main_data_begin > prev_frame_size) {
 		int part2_len = prev_frame_size - constant;
 		int part1_len = main_data_begin - part2_len;
-                int part12_len = part1_len + part2_len;
+		int part12_len = part1_len + part2_len;
 
 		int buffer_length = part12_len + frame_size;
 	 	int buffer_offset = main_data_begin + constant;
 
 		main_data = new unsigned char[buffer_length];
 		memcpy(main_data, buffer - buffer_offset, part1_len);
-                memcpy(&main_data[part1_len], buffer - part2_len, part2_len);
+		memcpy(&main_data[part1_len], buffer - part2_len, part2_len);
 		memcpy(&main_data[part12_len], buffer + constant, frame_size - constant);
 	} else {
 		int buffer_length = main_data_begin + frame_size;
@@ -466,20 +470,21 @@ inline void mp3::set_main_data(unsigned char *buffer)
  * This will get the scale factor indices from the main data. slen1 and slen2
  * represent the size in bits of each scaling factor. There are a total of 21 scaling
  * factors for long windows and 12 for each short window.
- * @param main_data - Buffer solely containing the main_data - excluding the frame header and side info.
+ * @param main_data Buffer solely containing the main_data - excluding the frame header and side info.
  * @param gr
  * @param ch
  */
 inline void mp3::unpack_scalefac(unsigned char *main_data, int gr, int ch, int &bit)
 {
-	int sfb, window;
+	int sfb = 0;
+	int window = 0;
 	int scalefactor_length[2] {
 		slen[scalefac_compress[gr][ch]][0],
 		slen[scalefac_compress[gr][ch]][1]};
 
-        int scalefac[39] = {0};
-        int i = 0;
-
+	int scalefac[39] = {0};
+	int i = 0;
+	
 	/* No scale factor transmission for short blocks. */
 	if (block_type[gr][ch] == 2 && window_switching[gr][ch]) {
 		if (mixed_block_flag[gr][ch] == 1) { /* Mixed blocks. */
@@ -499,7 +504,7 @@ inline void mp3::unpack_scalefac(unsigned char *main_data, int gr, int ch, int &
 					scalefac[i++] = scalefac_s[gr][ch][window][sfb];
 				}
 		}
-		while (sfb++ < 12) {
+		for (sfb = 6; sfb < 12; sfb++) {
 			for (window = 0; window < 3; window++) {
 				scalefac_s[gr][ch][window][sfb] = (int)get_bits_inc(main_data, &bit, scalefactor_length[1]);
 				scalefac[i++] = scalefac_s[gr][ch][window][sfb];
@@ -514,41 +519,31 @@ inline void mp3::unpack_scalefac(unsigned char *main_data, int gr, int ch, int &
 	/* Scale factors for long blocks. */
 	else {
 		if (gr == 0) {
-			for (sfb = 0; sfb < 11; sfb++) {
+			for (sfb = 0; sfb < 11; sfb++)
 				scalefac_l[gr][ch][sfb] = (int)get_bits_inc(main_data, &bit, scalefactor_length[0]);
-				scalefac[i++] = scalefac_l[gr][ch][sfb];
-			}
-			for (; sfb < 21; sfb++) {
+			for (; sfb < 21; sfb++)
 				scalefac_l[gr][ch][sfb] = (int)get_bits_inc(main_data, &bit, scalefactor_length[1]);
-				scalefac[i++] = scalefac_l[gr][ch][sfb];
-			}
 		} else {
 
-			/* Scale factors might be reused in the second granule.  */
+			/* Scale factors might be reused in the second granule. */
 			const int sb[5] = {6, 11, 16, 21};
 			for (int i = 0; i < 2; i++)
 				for (; sfb < sb[i]; sfb++) {
-					if (scfsi[ch][i] == 0) {
-						scalefac_l[gr][ch][sfb] = (int)get_bits_inc(main_data, &bit, scalefactor_length[0]);
-						scalefac[i++] = scalefac_l[gr][ch][sfb];
-					} else {
+					if (scfsi[ch][i])
 						scalefac_l[gr][ch][sfb] = scalefac_l[0][ch][sfb];
-						scalefac[i++] = scalefac_l[gr][ch][sfb];
-					}
+					else
+						scalefac_l[gr][ch][sfb] = (int)get_bits_inc(main_data, &bit, scalefactor_length[0]);
+						
 				}
 			for (int i = 2; i < 4; i++)
-				for (sfb = sb[i]; sfb < sb[i]; sfb++) {
-					if (scfsi[ch][i] == 0) {
-						scalefac_l[gr][ch][sfb] = (int)get_bits_inc(main_data, &bit, scalefactor_length[1]);
-						scalefac[i++] = scalefac_l[gr][ch][sfb];
-					} else {
+				for (; sfb < sb[i]; sfb++) {
+					if (scfsi[ch][i])
 						scalefac_l[gr][ch][sfb] = scalefac_l[0][ch][sfb];
-						scalefac[i++] = scalefac_l[gr][ch][sfb];
-					}
+					else
+						scalefac_l[gr][ch][sfb] = (int)get_bits_inc(main_data, &bit, scalefactor_length[1]);
 				}
 		}
 		scalefac_l[gr][ch][21] = 0;
-		scalefac[i++] = scalefac_l[gr][ch][sfb];
 	}
 }
 
@@ -567,7 +562,7 @@ inline void mp3::unpack_samples(unsigned char *main_data, int gr, int ch, int bi
 	int sample = 0;
 	int table_num;
 	const unsigned *table;
-
+	
 	/* Get the big value region boundaries. */
 	int region0;
 	int region1;
@@ -609,10 +604,10 @@ inline void mp3::unpack_samples(unsigned char *main_data, int gr, int ch, int bi
 				unsigned size = table[i + 1];
 				
 				/* TODO Need to update tables so that we can simply write:
-				 *      value == bit_sample >> (32 - size)  */
+				 *      value == bit_sample >> (32 - size) */
 				if (value >> (32 - size) == bit_sample >> (32 - size)) {
 					bit += size;
-
+					
 					int values[2] = {row, col};
 					for (int i = 0; i < 2; i++) {
 
@@ -634,18 +629,18 @@ inline void mp3::unpack_samples(unsigned char *main_data, int gr, int ch, int bi
 				}
 			}
 	}
-
+	
 	/* Quadruples region. */
 	for (; bit < max_bit && sample + 4 < 576; sample += 4) {
 		int values[4];
 
 		/* Flip bits. */
 		if (count1table_select[gr][ch] == 1) {
-			unsigned bit_sample = !get_bits_inc(main_data, &bit, 4);
-			values[0] = bit_sample & 0x08;
-			values[1] = bit_sample & 0x04;
-			values[2] = bit_sample & 0x02;
-			values[1] = bit_sample & 0x01;
+			unsigned bit_sample = get_bits_inc(main_data, &bit, 4);
+			values[0] = (bit_sample & 0x08) > 0 ? 0 : 1;
+			values[1] = (bit_sample & 0x04) > 0 ? 0 : 1;
+			values[2] = (bit_sample & 0x02) > 0 ? 0 : 1;
+			values[3] = (bit_sample & 0x01) > 0 ? 0 : 1;
 		} else {
 			unsigned bit_sample = get_bits(main_data, bit, bit + 32);
 			for (int entry = 0; entry < 16; entry++) {
@@ -665,54 +660,13 @@ inline void mp3::unpack_samples(unsigned char *main_data, int gr, int ch, int bi
 			if (values[i] > 0 && get_bits_inc(main_data, &bit, 1) == 1)
 				values[i] = -values[i];
 
-		if (bit < max_bit)
-			for (int i = 0; i < 4; i++)
-				samples[gr][ch][sample + i] = values[i];
+		for (int i = 0; i < 4; i++)
+			samples[gr][ch][sample + i] = values[i];
 	}
 
 	/* Fill remaining samples with zero. */
 	for (; sample < 576; sample++)
 		samples[gr][ch][sample] = 0;
-}
-
-/**
- * For short blocks there are a total of three windows. The original high frequency to
- * low frequency sample spectrum is divided into three segments, and is organized so
- * that there is a high to low, high to low, high to low pattern.
- * @param gr
- * @param ch
- */
-inline void mp3::reorder(int gr, int ch)
-{
-	if (block_type[gr][ch] == 2) {
-		char div_samples[192][3];
-
-		for (int group = 0; group < 192; group++) {
-			if (mixed_block_flag[gr][ch])
-				group += 12;
-			for (int sample = 0; sample < 3; sample++)
-				div_samples[group][sample] = samples[gr][ch][3 * group + sample];
-		}
-
-		for (int sample = 0; sample < 3; sample++)
-			for (int window = 0; window < 192; window++)
-				samples[gr][ch][192 * sample + window] = div_samples[window][sample];
-	}
-}
-
-/**
- * The left and right channels are added together to form the middle channel. The
- * difference between each channel is stored in the side channel.
- * @param gr
- */
-inline void mp3::ms_stereo(int gr)
-{
-	for (int sample = 0; sample < 576; sample++) {
-		int middle = samples[gr][0][sample];
-		int side = samples[gr][1][sample];
-		samples[gr][0][sample] = (middle - side) / SQRT2;
-		samples[gr][1][sample] = (middle + side) / SQRT2;
-	}
 }
 
 /**
@@ -725,43 +679,89 @@ inline void mp3::requantize(int gr, int ch)
 	float exp1, exp2;
 	int window = 0;
 	int sfb = 0;
-
-	for (int sample = 0; sample < 576; sample++) {
-		float scalefac_mult = (scalefac_scale[gr][ch] + 1.0) * 2.0;
-		
-		if (block_type[gr][ch] == 2 && window_switching[gr][ch]) {
-			float scalefac;
-			if (mixed_block_flag[gr][ch] == 1 && sfb < 8 && window == 0) {
-				if (sample >= band_index.long_win[sfb])
+	const float scalefac_mult = scalefac_scale[gr][ch] == 0 ? 0.5 : 1;
+	
+	for (int sample = 0, i = 0; sample < 576; sample++, i++) {
+		if (block_type[gr][ch] == 2 || (mixed_block_flag[gr][ch] && sfb >= 8)) {
+			if (i == band_width.short_win[sfb]) {
+				i = 0;
+				if (window == 2) {
+					window = 0;
 					sfb++;
-				scalefac = scalefac_l[gr][ch][sfb];
-			} else {
-				if (sample >= window * 192 + band_index.short_win[sfb]) {
-					if (sfb == 12) {
-						window++;
-						sfb = 0;
-					} else
-						sfb++;
-				}
-				scalefac = scalefac_s[gr][ch][window][sfb];
+				} else
+					window++;
 			}
-
+			
 			exp1 = global_gain[gr][ch] - 210.0 - 8.0 * subblock_gain[gr][ch][window];
-			exp2 = scalefac_mult * scalefac;
+			exp2 = scalefac_mult * scalefac_s[gr][ch][window][sfb];
 		} else {
-			exp1 = global_gain[gr][ch] - 210.0;
-			exp2 = scalefac_mult * scalefac_l[0][ch][sfb] + preflag[gr][ch] * pretab[sfb];
-
-			if (sample >= band_index.long_win[sfb])
+			if (sample == band_index.long_win[sfb + 1])
+				/* Don't increment sfb at the zeroth sample. */
 				sfb++;
+			
+			exp1 = global_gain[gr][ch] - 210.0;
+			exp2 = scalefac_mult * scalefac_l[gr][ch][sfb] + preflag[gr][ch] * pretab[sfb];
 		}
 
 		float sign = samples[gr][ch][sample] < 0 ? -1.0f : 1.0f;
 		float a = pow(abs(samples[gr][ch][sample]), 4.0 / 3.0);
 		float b = pow(2.0, exp1 / 4.0);
 		float c = pow(2.0, -exp2);
-
+		
 		samples[gr][ch][sample] = sign * a * b * c;
+	}
+}
+
+/**
+ * Reorder short blocks, mapping from scalefactor subbands (for short windows) to 18 sample blocks.
+ * @param gr
+ * @param ch
+ */
+inline void mp3::reorder(int gr, int ch)
+{
+	int total = 0;
+	int start = 0;
+	int block = 0;
+	float samples[576] = {0};
+
+	for (int sb = 0; sb < 12; sb++) {
+		const int SB_WIDTH = band_width.short_win[sb];
+		
+		for (int ss = 0; ss < SB_WIDTH; ss++) {			
+			samples[start + block + 0] = this->samples[gr][ch][total + ss + SB_WIDTH * 0];
+			samples[start + block + 6] = this->samples[gr][ch][total + ss + SB_WIDTH * 1];
+			samples[start + block + 12] = this->samples[gr][ch][total + ss + SB_WIDTH * 2]; 
+
+			if (block != 0 && block % 5 == 0) { /* 6 * 3 = 18 */
+				start += 18;
+				block = 0;
+			} else {
+				block++;
+			}
+		}
+
+		total += SB_WIDTH * 3;
+	}
+	
+	for (int i = 0; i < 576; i++)
+		this->samples[gr][ch][i] = samples[i];
+}
+
+/**
+ * The left and right channels are added together to form the middle channel. The
+ * difference between each channel is stored in the side channel.
+ * @param gr
+ */
+inline void mp3::ms_stereo(int gr)
+{		
+	for (int sample = 0; sample < 576; sample++) {
+		if (sample == 400)
+			int a = 2;
+		
+		float middle = samples[gr][0][sample];
+		float side = samples[gr][1][sample];
+		samples[gr][0][sample] = (middle + side) / SQRT2;
+		samples[gr][1][sample] = (middle - side) / SQRT2;
 	}
 }
 
@@ -771,25 +771,16 @@ inline void mp3::requantize(int gr, int ch)
  */
 inline void mp3::alias_reduction(int gr, int ch)
 {
-	static float cs[8] {
+	static const float cs[8] {
 			.8574929257, .8817419973, .9496286491, .9833145925,
 			.9955178161, .9991605582, .9998991952, .9999931551
 	};
-	static float ca[8] {
+	static const float ca[8] {
 			-.5144957554, -.4717319686, -.3133774542, -.1819131996,
 			-.0945741925, -.0409655829, -.0141985686, -.0036999747
 	};
 
-	float result[576];
-	/* Not all samples are assigned values (i.e. 17 - 8 == 9 && 0 + 7 = 7). */
-	for (int i = 0; i < 576; i++)
-		result[i] = samples[gr][ch][i];
-
-	int sb_max;
-	if (window_switching[gr][ch] && block_type[gr][ch] == 2)
-		sb_max = mixed_block_flag[gr][ch] ? 1 : 0;
-	else
-		sb_max = 32;
+	int sb_max = mixed_block_flag[gr][ch] ? 2 : 32;
 
 	for (int sb = 1; sb < sb_max; sb++)
 		for (int sample = 0; sample < 8; sample++) {
@@ -797,12 +788,9 @@ inline void mp3::alias_reduction(int gr, int ch)
 			int offset2 = 18 * sb + sample;
 			float s1 = samples[gr][ch][offset1];
 			float s2 = samples[gr][ch][offset2];
-			result[offset1] = s1 * cs[sample] - s2 * ca[sample];
-			result[offset2] = s2 * ca[sample] + s1 * cs[sample];
+			samples[gr][ch][offset1] = s1 * cs[sample] - s2 * ca[sample];
+			samples[gr][ch][offset2] = s2 * cs[sample] + s1 * ca[sample];
 		}
-
-	for (int i = 0; i < 576; i++)
-		samples[gr][ch][i] = result[i];
 }
 
 /**
@@ -816,9 +804,9 @@ inline void mp3::imdct(int gr, int ch)
 {
 	static bool init = true;
 	static float sine_block[4][36];
-	static float prev_samples[18];
+	static float prev_samples[2][32][18];
 	float sample_block[36];
-
+	
 	if (init) {
 		int i;
 		for (i = 0; i < 36; i++)
@@ -832,7 +820,7 @@ inline void mp3::imdct(int gr, int ch)
 		for (; i < 36; i++)
 			sine_block[1][i] = 0.0;
 		for (i = 0; i < 12; i++)
-			sine_block[2][i] = sin(PI / 36.0 * (i + 0.5));
+			sine_block[2][i] = sin(PI / 12.0 * (i + 0.5));
 		for (i = 0; i < 6; i++)
 			sine_block[3][i] = 0.0;
 		for (; i < 12; i++)
@@ -843,46 +831,47 @@ inline void mp3::imdct(int gr, int ch)
 			sine_block[3][i] = sin(PI / 36.0 * (i + 0.5));
 	}
 
-	const int n = block_type[gr][ch] == 2 ? 12 : 36;
+	const int N = block_type[gr][ch] == 2 ? 12 : 36;
+	const int HALF_N = N / 2;
 	int sample = 0;
-
+	
 	for (int block = 0; block < 32; block++) {
-		for (int i = 0; i < n; i++) {
-			float xi = 0.0;
-			for (int k = 0; k < n/2; k++) {
-				float s = samples[gr][ch][18 * block + k];
-				xi += s * cos(PI / (2 * n) * (2 * i + 1 + n / 2) * (2 * k + 1));
+		for (int win = 0; win < (block_type[gr][ch] == 2 ? 3 : 1); win++) {
+			for (int i = 0; i < N; i++) {
+				float xi = 0.0;
+				for (int k = 0; k < HALF_N; k++) {
+					float s = samples[gr][ch][18 * block + HALF_N * win + k];
+					xi += s * cos(PI / (2 * N) * (2 * i + 1 + HALF_N) * (2 * k + 1));
+				}
+
+				/* Windowing samples. */
+				sample_block[win * N + i] = xi * sine_block[block_type[gr][ch]][i];
 			}
-				
-			/* Windowing samples. */
-			sample_block[i] = xi * sine_block[block_type[gr][ch]][i];
 		}
 
-		if (block_type[gr][ch] == 2 && !(block == 0 && window_switching[gr][ch])) {
+		if (block_type[gr][ch] == 2) {
 			float temp_block[36];
 			memcpy(temp_block, sample_block, 36 * 4);
 
-			/* Overlap samples. */
-			for (int i = 0; i < 36; i++) {
-				int j = 0;
-				for (; j < 6; j++)
-					sample_block[i] = 0;
-				for (; j < 12; j++)
-					sample_block[i] = temp_block[i - 6];
-				for (; j < 18; j++)
-					sample_block[i] = temp_block[i - 6]  + temp_block[i - 12];
-				for (; j < 24; j++)
-					sample_block[i] = temp_block[i - 12] + temp_block[i - 18];
-				for (; j < 30; j++)
-					sample_block[i] = temp_block[i - 18];
-				for (; j < 36; j++)
-					sample_block[i] = 0;
-			}
+			int i = 0;
+			for (; i < 6; i++)
+				sample_block[i] = 0;
+			for (; i < 12; i++)
+				sample_block[i] = temp_block[0 + i - 6];
+			for (; i < 18; i++)
+				sample_block[i] = temp_block[0 + i - 6] + temp_block[12 + i - 12];
+			for (; i < 24; i++)
+				sample_block[i] = temp_block[12 + i - 12] + temp_block[24 + i - 18];
+			for (; i < 30; i++)
+				sample_block[i] = temp_block[24 + i - 18];
+			for (; i < 36; i++)
+				sample_block[i] = 0;
 		}
-
+		
+		/* Overlap. */
 		for (int i = 0; i < 18; i++) {
-			samples[gr][ch][sample + i] += sample_block[i] + prev_samples[i];
-			prev_samples[i] = sample_block[18 + i];
+			samples[gr][ch][sample + i] = sample_block[i] + prev_samples[ch][block][i];
+			prev_samples[ch][block][i] = sample_block[18 + i];
 		}
 		sample += 18;
 	}
@@ -905,19 +894,19 @@ inline void mp3::frequency_inversion(int gr, int ch)
  */
 inline void mp3::synth_filterbank(int gr, int ch)
 {
-	static float fifo[2][576];
-	static float lookup[64][32];
+	static float fifo[2][1024];
+	static float N[64][32];
 	static bool init = true;
-
+	
 	if (init) {
 		init = false;
 		for (int i = 0; i < 64; i++)
 			for (int j = 0; j < 32; j++)
-				lookup[i][j] = cos(PI / 64.0 * (2.0 * j + 1.0) * (16.0 + j));
+				N[i][j] = cos((16.0 + i) * (2.0 * j + 1.0) * (PI / 64.0));
 	}
 
-	float S[32], U[512], sum;
-	float temp_samples[576];
+	float S[32], U[512], W[512];
+	float pcm[576];
 
 	for (int sb = 0; sb < 18; sb++) {
 		for (int i = 0; i < 32; i++)
@@ -929,7 +918,7 @@ inline void mp3::synth_filterbank(int gr, int ch)
 		for (int i = 0; i < 64; i++) {
 			fifo[ch][i] = 0.0;
 			for (int j = 0; j < 32; j++)
-				fifo[ch][i] += S[j] * lookup[i][j];
+				fifo[ch][i] += S[j] * N[i][j];
 		}
 
 		for (int i = 0; i < 8; i++)
@@ -939,20 +928,33 @@ inline void mp3::synth_filterbank(int gr, int ch)
 			}
 
 		for (int i = 0; i < 512; i++)
-			U[i] *= synth_window[i];
+			W[i] = U[i] * synth_window[i];
 
 		for (int i = 0; i < 32; i++) {
-			sum = 0;
+			float sum = 0;
 			for (int j = 0; j < 16; j++)
-				sum += U[j * 32 + i];
-			temp_samples[32 * sb + i] = sum;
+				sum += W[j * 32 + i];
+			pcm[32 * sb + i] = sum;
 		}
 	}
 
-	memcpy(samples[gr][ch], temp_samples, 576 * 4);
+	memcpy(samples[gr][ch], pcm, 576 * 4);
+}
+
+void mp3::interleave()
+{
+	int i = 0;
+	static const int CHANNELS = mono ? 1 : 2;
+	for (int gr = 0; gr < 2; gr++) {
+		for (int sample = 0; sample < 576; sample++) {
+			for (int ch = 0; ch < CHANNELS; ch++) {
+				pcm[i++] = samples[gr][ch][sample];
+			}
+		}
+	}
 }
 
 float *mp3::get_samples()
 {
-	return samples[0][0];
+	return pcm;
 }

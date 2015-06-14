@@ -54,6 +54,10 @@ private: /* Header */
 		const unsigned *long_win;
 		const unsigned *short_win;
 	} band_index;
+	struct {
+		const unsigned *long_win;
+		const unsigned *short_win;
+	} band_width;
 	
 	void set_mpeg_version();
 	void set_layer(unsigned char byte);
@@ -67,9 +71,6 @@ private: /* Header */
 	void set_info();
 	void set_tables();
 	
-	void test();
-	
-	
 public:
 	float get_mpeg_version();
 	unsigned get_layer();
@@ -79,22 +80,22 @@ public:
 	bool get_padding();
 	
 	/**
-	Values:
-	0 | Stereo
-	1 | Joint stereo (this option requires use of mode_extension)
-	2 | Dual channel
-	3 | Single channel
-	**/
+	 * Values:
+	 * 0 -> Stereo
+	 * 1 -> Joint stereo (this option requires use of mode_extension)
+	 * 2 -> Dual channel
+	 * 3 -> Single channel
+	 */
 	unsigned get_channel_mode();
 	unsigned *get_mode_extension();
 	
 	/**
-	Values:
-	0 | None
-	1 | 50/15 MS
-	2 | Reserved
-	3 | CCIT J.17
-	**/
+	 * Values:
+	 * 0 -> None
+	 * 1 -> 50/15 MS
+	 * 2 -> Reserved
+	 * 3 -> CCIT J.17
+	 */
 	unsigned get_emphasis();
 	bool *get_info();
 	
@@ -102,7 +103,6 @@ private: /* Frame */
 	int prev_frame_size;
 	int frame_size;
 	
-	int prev_main_data_begin;
 	int main_data_begin;
 	bool scfsi[2][4];
 	
@@ -124,7 +124,7 @@ private: /* Frame */
 	int region0_count[2][2];
 	int region1_count[2][2];
 	int preflag[2][2];
-	float scalefac_scale[2][2];
+	int scalefac_scale[2][2];
 	int count1table_select[2][2];
 	
 	int scalefactor[2][2][39];
@@ -132,6 +132,7 @@ private: /* Frame */
 	int scalefac_s[2][2][3][13];
 	
 	float samples[2][2][576];
+	float pcm[576 * 4];
 	
 	void set_frame_size();
 	void set_side_info(unsigned char *buffer);
@@ -145,6 +146,7 @@ private: /* Frame */
 	void imdct(int gr, int ch);
 	void frequency_inversion(int gr, int ch);
 	void synth_filterbank(int gr, int ch);
+	void interleave();
 	
 public:
 	float *get_samples();

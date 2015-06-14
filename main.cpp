@@ -24,8 +24,8 @@ using std::ifstream;
 /**
  * Start decoding the MP3 and let ALSA hand the PCM stream over to a driver.
  * @param mp3_decode
- * @param buffer - A buffer containing the MP3 bit stream.
- * @param offset - An offset to the a MP3 frame header.
+ * @param buffer A buffer containing the MP3 bit stream.
+ * @param offset An offset to the a MP3 frame header.
  */
 inline void stream(mp3 &mp3_decode, unsigned char *buffer, unsigned offset)
 {
@@ -45,7 +45,7 @@ inline void stream(mp3 &mp3_decode, unsigned char *buffer, unsigned offset)
 	if (snd_pcm_hw_params_set_access(handle, hw, SND_PCM_ACCESS_RW_INTERLEAVED) < 0) {
 		exit(1);
 	}
-	if (snd_pcm_hw_params_set_format(handle, hw, SND_PCM_FORMAT_FLOAT) < 0) {
+	if (snd_pcm_hw_params_set_format(handle, hw, SND_PCM_FORMAT_FLOAT_LE) < 0) {
 		exit(1);
 	}
 	if (snd_pcm_hw_params_set_channels(handle, hw, channels) < 0) {
