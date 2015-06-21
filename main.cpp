@@ -74,11 +74,11 @@ inline void stream(mp3 &mp3_decode, unsigned char *buffer, unsigned offset)
 			mp3_decode.init_frame_params(&buffer[offset]);
 			offset += mp3_decode.get_frame_size();
 		}
+		mp3_decode.get_samples();
 
 		int e = snd_pcm_writei(handle, mp3_decode.get_samples(), 1152);
-		if (e == -EPIPE) {
+		if (e == -EPIPE)
 			snd_pcm_recover(handle, e, 0);
-		}
 	}
 
 	snd_pcm_drain(handle);

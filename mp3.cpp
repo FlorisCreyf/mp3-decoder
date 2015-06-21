@@ -45,7 +45,7 @@ void mp3::init_header_params(unsigned char *buffer)
 
 /**
  * Unpack and decode the MP3 frame.
- * @param buffer A pointer that points to the first byte of the frame header.
+ * @param buffer A pointer to the first byte of the frame header.
  */
 void mp3::init_frame_params(unsigned char *buffer)
 {
@@ -65,6 +65,7 @@ void mp3::init_frame_params(unsigned char *buffer)
 				alias_reduction(gr, ch);
 			
 			imdct(gr, ch);
+			frequency_inversion(gr, ch);
 			synth_filterbank(gr, ch);
 		}
 	}
@@ -173,9 +174,7 @@ unsigned mp3::get_bit_rate()
 	return bit_rate;
 }
 
-/**
- * Sampling rate.
- */
+/** Sampling rate. */
 inline void mp3::set_sampling_rate()
 {
 	int rates[3][3] {44100, 48000, 32000, 22050, 24000, 16000, 11025, 12000, 8000};
@@ -228,9 +227,7 @@ inline void mp3::set_tables()
 	}
 }
 
-/**
- * If set, the frame size is 1 byte larger.
- */
+/** If set, the frame size is 1 byte larger. */
 inline void mp3::set_padding()
 {
 	padding = buffer[2] & 0x02;
@@ -735,9 +732,8 @@ inline void mp3::reorder(int gr, int ch)
 			if (block != 0 && block % 5 == 0) { /* 6 * 3 = 18 */
 				start += 18;
 				block = 0;
-			} else {
+			} else
 				block++;
-			}
 		}
 
 		total += SB_WIDTH * 3;
@@ -755,9 +751,6 @@ inline void mp3::reorder(int gr, int ch)
 inline void mp3::ms_stereo(int gr)
 {		
 	for (int sample = 0; sample < 576; sample++) {
-		if (sample == 400)
-			int a = 2;
-		
 		float middle = samples[gr][0][sample];
 		float side = samples[gr][1][sample];
 		samples[gr][0][sample] = (middle + side) / SQRT2;
@@ -883,9 +876,9 @@ inline void mp3::imdct(int gr, int ch)
  */
 inline void mp3::frequency_inversion(int gr, int ch)
 {
-	for (int sb = 1; sb < 32; sb += 2)
-		for (int sample = 1; sample < 18; sample += 2)
-			samples[gr][ch][18 * sb + sample] *= -1.0;
+	for (int sb = 1; sb < 18; sb += 2)
+		for (int i = 1; i < 32; i += 2)
+			samples[gr][ch][i * 18 + sb] *= -1;
 }
 
 /**
@@ -941,17 +934,15 @@ inline void mp3::synth_filterbank(int gr, int ch)
 	memcpy(samples[gr][ch], pcm, 576 * 4);
 }
 
-void mp3::interleave()
+inline void mp3::interleave()
 {
 	int i = 0;
 	static const int CHANNELS = mono ? 1 : 2;
-	for (int gr = 0; gr < 2; gr++) {
-		for (int sample = 0; sample < 576; sample++) {
-			for (int ch = 0; ch < CHANNELS; ch++) {
+	for (int gr = 0; gr < 2; gr++)
+		for (int sample = 0; sample < 576; sample++)
+			for (int ch = 0; ch < CHANNELS; ch++)
 				pcm[i++] = samples[gr][ch][sample];
-			}
-		}
-	}
+	
 }
 
 float *mp3::get_samples()
