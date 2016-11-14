@@ -9,10 +9,7 @@
 #include <string>
 #include <vector>
 #include <stdio.h>
-#include <iostream>
 
-using std::cout;
-using std::endl;
 using std::string;
 using std::vector;
 
@@ -27,6 +24,7 @@ using std::vector;
 class id3 {
 private:
 	unsigned char *buffer;
+	bool valid;
 	unsigned int start;
 	string version;
 	unsigned int offset;
@@ -34,21 +32,17 @@ private:
 	unsigned int extended_header_size;
 	vector<string> id3_frames[2];
 
-	int char_to_int(unsigned char *buffer);
-
 	void set_version(unsigned char version, unsigned char revision);
-	void set_flags(unsigned char flags);
+	bool set_flags(unsigned char flags);
 	void set_offset(int offset);
 	void set_extended_header_size(int size);
 	void set_fields(unsigned char *buffer);
 
 public:
 	id3(unsigned char *buffer);
-	id3(const id3& orig);
-	virtual ~id3();
-
-	static id3 get_all();
-
+	id3(const id3 &orig);
+	
+	bool is_valid();
 	string get_id3_version();
 	bool *get_id3_flags();
 	int get_id3_offset();
@@ -58,3 +52,4 @@ public:
 };
 
 #endif	/* ID3_H */
+

@@ -7,6 +7,7 @@
  */
 
 #include <regex>
+#include "util.h"
 #include "id3.h"
 
 id3::id3(unsigned char *buffer)
@@ -15,14 +16,18 @@ id3::id3(unsigned char *buffer)
 	
 	if (buffer[0] == 'I' && buffer[1] == 'D' && buffer[2] == '3') {
 		set_version(buffer[3], buffer[4]);
-		set_flags(buffer[5]);
-		set_offset(char_to_int(&buffer[6]));
-		set_extended_header_size(char_to_int(&buffer[10]));
-		set_fields(&buffer[10 + extended_header_size]);
-	}
+		if(set_flags(buffer[5])) {
+			valid = true;
+			set_offset(char_to_int(&buffer[6]));
+			set_extended_header_size(char_to_int(&buffer[10]));
+			set_fields(&buffer[10 + extended_header_size]);
+		} else
+			valid = false;
+	} else
+		valid = false;
 }
 
-id3::id3(const id3& orig)
+id3::id3(const id3 &orig)
 {
 	this->start = orig.start;
 	this->version = orig.version;
@@ -34,16 +39,9 @@ id3::id3(const id3& orig)
 		this->id3_frames[i] = orig.id3_frames[i];
 }
 
-id3::~id3()
+bool id3::is_valid()
 {
-}
-
-int id3::char_to_int(unsigned char *buffer)
-{
-	unsigned offset = 0x00;
-	for (int i = 0; i < start + 4; i++)
-		offset = (offset << 7) + buffer[i];
-	return offset;
+	return valid;
 }
 
 void id3::set_version(unsigned char version, unsigned char revision)
@@ -68,20 +66,20 @@ int id3::get_id3_offset()
 	return this->offset;
 }
 
-void id3::set_flags(unsigned char flags)
+bool id3::set_flags(unsigned char flags)
 {
 	/* These flags must be unset for the ID3 header to be valid. */
 	for (int bit_num = 0; bit_num < 4; bit_num++)
 		if (flags >> bit_num & 1)
-			delete this;
+			return false;
 
-	/* The position of each flag is associated with a FLAG_XXX macro. */
-	for (int bit_num = 4; bit_num < 8; bit_num++) {
+	for (int bit_num = 4; bit_num < 8; bit_num++)
 		if (flags >> bit_num & 1)
-			this->id3_flags[bit_num - 4] = true;
+			this->id3_flags[bit_num-4] = true;
 		else
-			this->id3_flags[bit_num - 4] = false;
-	}
+			this->id3_flags[bit_num-4] = false;
+
+	return true;
 }
 
 bool *id3::get_id3_flags()
@@ -140,3 +138,4 @@ unsigned int id3::get_id3_fields_length()
 {
 	return this->id3_frames[1].size();
 }
+

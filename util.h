@@ -25,4 +25,8 @@ unsigned get_bits(unsigned char *buffer, int start_bit, int end_bit);
  */
 unsigned get_bits_inc(unsigned char *buffer, int *offset, int count);
 
+/** Puts four bytes into a single four byte integer type. */
+int char_to_int(unsigned char *buffer);
+
 #endif	/* UTIL_H */
+

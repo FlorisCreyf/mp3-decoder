@@ -4,16 +4,8 @@
  * Unpacks and decodes frames/headers.
  */
 
-#include <iostream>
-#include <ios>
-#include <iomanip>
 #include <math.h>
-
 #include "tables.h"
-
-using std::cout;
-using std::endl;
-using std::setw;
 
 #ifndef MP3_H
 #define MP3_H
@@ -25,10 +17,7 @@ using std::setw;
 class mp3 {
 public:
 	mp3(unsigned char *buffer);
-	mp3(const mp3 &orig);
-	virtual ~mp3();
- 
-	void init_header_params(unsigned char *buffer);
+ 	void init_header_params(unsigned char *buffer);
 	void init_frame_params(unsigned char *buffer);
 	
 private:
@@ -154,3 +143,4 @@ public:
 };
 
 #endif	/* MP3_H */
+

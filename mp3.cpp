@@ -82,14 +82,6 @@ mp3::mp3(unsigned char *buffer)
 	}
 }
 
-mp3::mp3(const mp3 &orig)
-{
-}
-
-mp3::~mp3()
-{
-}
-
 /** Check validity of the header and frame. */
 bool mp3::is_valid()
 {
@@ -97,7 +89,7 @@ bool mp3::is_valid()
 }
 
 /** Determine MPEG version. */
-inline void mp3::set_mpeg_version()
+void mp3::set_mpeg_version()
 {
 	if ((buffer[1] & 0x10) == 0x10 && (buffer[1] & 0x08) == 0x08)
 		mpeg_version = 1;
@@ -115,7 +107,7 @@ float mp3::get_mpeg_version()
 }
 
 /** Determine layer. */
-inline void mp3::set_layer(unsigned char byte)
+void mp3::set_layer(unsigned char byte)
 {
 	byte = byte << 5;
 	byte = byte >> 6;
@@ -131,7 +123,7 @@ unsigned mp3::get_layer()
  * Cyclic redundancy check. If set, two bytes after the header information are
  * used up by the CRC.
  */
-inline void mp3::set_crc()
+void mp3::set_crc()
 {
 	crc = buffer[1] & 0x01;
 }
@@ -144,7 +136,7 @@ bool mp3::get_crc()
 /**
  * For variable bit rate (VBR) files, this data has to be gathered constantly.
  */
-inline void mp3::set_bit_rate(unsigned char *buffer)
+void mp3::set_bit_rate(unsigned char *buffer)
 {
 	if (mpeg_version == 1) {
 		if (layer == 1) {
@@ -175,7 +167,7 @@ unsigned mp3::get_bit_rate()
 }
 
 /** Sampling rate. */
-inline void mp3::set_sampling_rate()
+void mp3::set_sampling_rate()
 {
 	int rates[3][3] {44100, 48000, 32000, 22050, 24000, 16000, 11025, 12000, 8000};
 
@@ -203,7 +195,7 @@ unsigned mp3::get_sampling_rate()
  * During the decoding process different tables are used depending on the
  * sampling rate.
  */
-inline void mp3::set_tables()
+void mp3::set_tables()
 {
 	switch (sampling_rate) {
 		case 32000:
@@ -228,7 +220,7 @@ inline void mp3::set_tables()
 }
 
 /** If set, the frame size is 1 byte larger. */
-inline void mp3::set_padding()
+void mp3::set_padding()
 {
 	padding = buffer[2] & 0x02;
 }
@@ -244,7 +236,7 @@ bool mp3::get_padding()
  * 2 -> Dual channel
  * 3 -> Single channel
  */
-inline void mp3::set_channel_mode(unsigned char *buffer)
+void mp3::set_channel_mode(unsigned char *buffer)
 {
 	channel_mode = buffer[3] >> 6;
 }
@@ -255,7 +247,7 @@ unsigned mp3::get_channel_mode()
 }
 
 /** Applies only to joint stereo. */
-inline void mp3::set_mode_extension(unsigned char *buffer)
+void mp3::set_mode_extension(unsigned char *buffer)
 {
 	if (layer == 3) {
 		mode_extension[0] = buffer[3] & 0x20;
@@ -269,7 +261,7 @@ unsigned *mp3::get_mode_extension()
 }
 
 /** Although rarely used, there is no method for emphasis. */
-inline void mp3::set_emphasis(unsigned char *buffer)
+void mp3::set_emphasis(unsigned char *buffer)
 {
 	emphasis = buffer[3] << 6;
 	emphasis = emphasis >> 6;
@@ -281,7 +273,7 @@ unsigned mp3::get_emphasis()
 }
 
 /** Additional information (not important). */
-inline void mp3::set_info()
+void mp3::set_info()
 {
 	info[0] = buffer[2] & 0x01;
 	info[1] = buffer[3] & 0x08;
@@ -294,7 +286,7 @@ bool *mp3::get_info()
 }
 
 /** Determine the frame size. */
-inline void mp3::set_frame_size()
+void mp3::set_frame_size()
 {
 	unsigned int samples_per_frame;
 	switch (layer) {
@@ -326,7 +318,7 @@ unsigned mp3::get_frame_size()
  * The side information contains information on how to decode the main_data.
  * @param buffer A pointer to the first byte of the side info.
  */
-inline void mp3::set_side_info(unsigned char *buffer)
+void mp3::set_side_info(unsigned char *buffer)
 {
 	int count = 0;
 
@@ -420,7 +412,7 @@ inline void mp3::set_side_info(unsigned char *buffer)
  * frames. Unpacks the scaling factors and quantized samples.
  * @param buffer A buffer that points to the the first byte of the frame header.
  */
-inline void mp3::set_main_data(unsigned char *buffer)
+void mp3::set_main_data(unsigned char *buffer)
 {
 	/* header + side_information */
 	int constant = mono ? 21 : 36;
@@ -471,7 +463,7 @@ inline void mp3::set_main_data(unsigned char *buffer)
  * @param gr
  * @param ch
  */
-inline void mp3::unpack_scalefac(unsigned char *main_data, int gr, int ch, int &bit)
+void mp3::unpack_scalefac(unsigned char *main_data, int gr, int ch, int &bit)
 {
 	int sfb = 0;
 	int window = 0;
@@ -554,7 +546,7 @@ inline void mp3::unpack_scalefac(unsigned char *main_data, int gr, int ch, int &
  * @param gr
  * @param ch
  */
-inline void mp3::unpack_samples(unsigned char *main_data, int gr, int ch, int bit, int max_bit)
+void mp3::unpack_samples(unsigned char *main_data, int gr, int ch, int bit, int max_bit)
 {
 	int sample = 0;
 	int table_num;
@@ -671,7 +663,7 @@ inline void mp3::unpack_samples(unsigned char *main_data, int gr, int ch, int bi
  * @param gr
  * @param ch
  */
-inline void mp3::requantize(int gr, int ch)
+void mp3::requantize(int gr, int ch)
 {
 	float exp1, exp2;
 	int window = 0;
@@ -714,7 +706,7 @@ inline void mp3::requantize(int gr, int ch)
  * @param gr
  * @param ch
  */
-inline void mp3::reorder(int gr, int ch)
+void mp3::reorder(int gr, int ch)
 {
 	int total = 0;
 	int start = 0;
@@ -748,7 +740,7 @@ inline void mp3::reorder(int gr, int ch)
  * difference between each channel is stored in the side channel.
  * @param gr
  */
-inline void mp3::ms_stereo(int gr)
+void mp3::ms_stereo(int gr)
 {		
 	for (int sample = 0; sample < 576; sample++) {
 		float middle = samples[gr][0][sample];
@@ -762,7 +754,7 @@ inline void mp3::ms_stereo(int gr)
  * @param gr
  * @param ch
  */
-inline void mp3::alias_reduction(int gr, int ch)
+void mp3::alias_reduction(int gr, int ch)
 {
 	static const float cs[8] {
 			.8574929257, .8817419973, .9496286491, .9833145925,
@@ -793,7 +785,7 @@ inline void mp3::alias_reduction(int gr, int ch)
  * @param gr
  * @param ch
  */
-inline void mp3::imdct(int gr, int ch)
+void mp3::imdct(int gr, int ch)
 {
 	static bool init = true;
 	static float sine_block[4][36];
@@ -874,7 +866,7 @@ inline void mp3::imdct(int gr, int ch)
  * @param gr
  * @param ch
  */
-inline void mp3::frequency_inversion(int gr, int ch)
+void mp3::frequency_inversion(int gr, int ch)
 {
 	for (int sb = 1; sb < 18; sb += 2)
 		for (int i = 1; i < 32; i += 2)
@@ -885,7 +877,7 @@ inline void mp3::frequency_inversion(int gr, int ch)
  * @param gr
  * @param ch
  */
-inline void mp3::synth_filterbank(int gr, int ch)
+void mp3::synth_filterbank(int gr, int ch)
 {
 	static float fifo[2][1024];
 	static float N[64][32];
@@ -934,7 +926,7 @@ inline void mp3::synth_filterbank(int gr, int ch)
 	memcpy(samples[gr][ch], pcm, 576 * 4);
 }
 
-inline void mp3::interleave()
+void mp3::interleave()
 {
 	int i = 0;
 	static const int CHANNELS = mono ? 1 : 2;
@@ -949,3 +941,4 @@ float *mp3::get_samples()
 {
 	return pcm;
 }
+

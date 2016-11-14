@@ -34,9 +34,8 @@ unsigned get_bits(unsigned char *buffer, int start_bit, int end_bit)
 		}
 		result <<= end_bit + 1;
 		result += buffer[end_byte] >> (7 - end_bit);
-	} else if (end_bit != 7) {
+	} else if (end_bit != 7)
 		result >>= (7 - end_bit);
-	}
 	
 	return result;
 }
@@ -47,3 +46,12 @@ unsigned get_bits_inc(unsigned char *buffer, int *offset, int count)
 	*offset += count;
 	return result;
 }
+
+int char_to_int(unsigned char *buffer)
+{
+	unsigned num = 0x00;
+	for (int i = 0; i < 4; i++)
+		num = (num << 7) + buffer[i];
+	return num;
+}
+

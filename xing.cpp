@@ -6,17 +6,19 @@
  */
 
 #include "xing.h"
+#include "util.h"
+#include <string>
 
 xing::xing(unsigned char *buffer, unsigned int offset)
 {
-	string id;
+	std::string id;
 
 	/* The position of the Xing header within the first MP3 frame is unknown. */
 	while (true) {
 		if (buffer[offset] == 'I' || buffer[offset] == 'X') {
-			for (int byte = 0; byte < 4; byte++) {
+			for (int byte = 0; byte < 4; byte++) 
 				id += buffer[offset + byte];
-			}
+
 			if (id == "Info" || id == "Xing") {
 				this->start = offset + 4;
 				set_xing_extensions(buffer, offset);
@@ -27,9 +29,9 @@ xing::xing(unsigned char *buffer, unsigned int offset)
 				if (this->xing_extensions[2]) set_quality(buffer);
 				break;
 			}
-		} else if (buffer[offset] == 0xFF && buffer[offset + 1] >= 0xE0) {
+		} else if (buffer[offset] == 0xFF && buffer[offset+1] >= 0xE0)
 			break;
-		}
+
 		offset++;
 	}
 }
@@ -39,35 +41,20 @@ xing::xing(const xing &orig)
 	this->byte_quantity = orig.byte_quantity;
 	this->frame_quantity = orig.frame_quantity;
 	this->quality = orig.quality;
-	for (int byte = 0; byte < 4; byte++) {
+	for (int byte = 0; byte < 4; byte++)
 		this->xing_extensions[byte] = orig.xing_extensions[byte];
-	}
-}
-
-xing::~xing()
-{
-}
-
-int xing::char_to_int(unsigned char *buffer, unsigned int start)
-{
-	unsigned offset = 0x00;
-	for (int byte_num = start; byte_num < start + 4; byte_num++) {
-		offset = buffer[byte_num];
-	}
-	return offset;
 }
 
 void xing::set_xing_extensions(unsigned char* buffer, unsigned int offset)
 {
 	unsigned char flag_byte = buffer[this->start + 3];
 
-	for (int bit_num = 0; bit_num < 4; bit_num++) {
-		if (flag_byte >> bit_num & 1) {
+	for (int bit_num = 0; bit_num < 4; bit_num++)
+		if (flag_byte >> bit_num & 1)
 			this->xing_extensions[bit_num] = true;
-		} else {
+		else
 			this->xing_extensions[bit_num] = false;
-		}
-	}
+	
 	this->start += 4;
 }
 
@@ -78,7 +65,7 @@ bool *xing::get_xing_extensions()
 
 void xing::set_frame_quantity(unsigned char *buffer)
 {
-	this->frame_quantity = char_to_int(buffer, this->start + (this->field_num * 4));
+	this->frame_quantity = char_to_int(&buffer[this->start + this->field_num*4]);
 	this->field_num++;
 }
 
@@ -89,7 +76,7 @@ int xing::get_frame_quantity()
 
 void xing::set_byte_quantity(unsigned char *buffer)
 {
-	this->byte_quantity = char_to_int(buffer, this->start + (this->field_num * 4));
+	this->byte_quantity = char_to_int(&buffer[this->start + this->field_num*4]);
 	this->field_num++;
 }
 
@@ -101,10 +88,11 @@ int xing::get_byte_quantity()
 void xing::set_quality(unsigned char *buffer)
 {
 	unsigned char size = (this->xing_extensions[XING_EXT_TOC] == true ? 100 : 0);
-	this->quality = buffer[this->start + size + this->field_num * 4 + 3];
+	this->quality = buffer[this->start + size + this->field_num*4 + 3];
 }
 
 unsigned char xing::get_quality()
 {
 	return this->quality;
 }
+

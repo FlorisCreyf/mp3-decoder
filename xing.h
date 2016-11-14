@@ -5,13 +5,6 @@
  * | TOC (optional) | Quality (optional) |
  */
 
-#include <iostream>
-#include <string>
-
-using std::string;
-using std::cout;
-using std::endl;
-
 #ifndef XING_H
 #define XING_H
 
@@ -37,8 +30,6 @@ private:
 	bool test[4];
 	/* char *TOC; */
 
-	int char_to_int(unsigned char *buffer, unsigned int start);
-
 	void set_xing_extensions(unsigned char *buffer, unsigned int offset);
 	void set_byte_quantity(unsigned char *buffer);
 	void set_frame_quantity(unsigned char *buffer);
@@ -46,17 +37,16 @@ private:
 
 public:
 	xing(unsigned char *buffer, unsigned int offset);
-	xing(const xing& orig);
-	virtual ~xing();
+	xing(const xing &orig);
 
 	bool *get_xing_extensions();
 	int get_byte_quantity();
 	int get_frame_quantity();
 
-	/**
-	 * A rating of the Xing quality ranging from 0 (best) to 100 (worst).
-	 */
+	/** A rating of the Xing quality ranging from 0 (best) to 100 (worst). */
 	unsigned char get_quality();
 };
 
 #endif	/* XING_H */
+
+
