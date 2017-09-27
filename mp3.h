@@ -10,12 +10,21 @@
 #ifndef MP3_H
 #define MP3_H
 
-#define MP3_INFO_PRIVATE   0
-#define MP3_INFO_COPYRIGHT 1
-#define MP3_INFO_ORIGINAL  2
-
 class mp3 {
 public:
+        enum ChannelMode {
+		Stereo = 0,
+		JointStereo = 1,
+		DualChannel = 2,
+		Mono = 3
+        };
+	enum Emphasis {
+		None = 0,
+		MS5015 = 1,
+		Reserved = 2,
+		CCITJ17 = 3
+        };
+        
 	mp3(unsigned char *buffer);
  	void init_header_params(unsigned char *buffer);
 	void init_frame_params(unsigned char *buffer);
@@ -34,10 +43,10 @@ private: /* Header */
 	unsigned bit_rate;
 	unsigned sampling_rate;
 	bool padding;
-	unsigned channel_mode;
-	bool mono;
+	ChannelMode channel_mode;
+	int channels;
 	unsigned mode_extension[2];
-	unsigned emphasis;
+	Emphasis emphasis;
 	bool info[3];
 	struct {
 		const unsigned *long_win;
@@ -59,7 +68,7 @@ private: /* Header */
 	void set_emphasis(unsigned char *buffer);
 	void set_info();
 	void set_tables();
-	
+        
 public:
 	float get_mpeg_version();
 	unsigned get_layer();
@@ -67,25 +76,9 @@ public:
 	unsigned get_bit_rate();
 	unsigned get_sampling_rate();
 	bool get_padding();
-	
-	/**
-	 * Values:
-	 * 0 -> Stereo
-	 * 1 -> Joint stereo (this option requires use of mode_extension)
-	 * 2 -> Dual channel
-	 * 3 -> Single channel
-	 */
-	unsigned get_channel_mode();
+	ChannelMode get_channel_mode();
 	unsigned *get_mode_extension();
-	
-	/**
-	 * Values:
-	 * 0 -> None
-	 * 1 -> 50/15 MS
-	 * 2 -> Reserved
-	 * 3 -> CCIT J.17
-	 */
-	unsigned get_emphasis();
+	Emphasis get_emphasis();
 	bool *get_info();
 	
 private: /* Frame */

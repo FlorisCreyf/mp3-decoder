@@ -20,20 +20,13 @@ void mp3::init_header_params(unsigned char *buffer)
 	if (buffer[0] == 0xFF && buffer[1] >= 0xE0) {
 		this->buffer = buffer;
 
-		static bool init = true;
-		if (init) {
-			set_mpeg_version();
-			set_layer(buffer[1]);
-			set_crc();
-			set_info();
-			set_emphasis(buffer);
-			set_sampling_rate();
-			set_tables();
-
-			mono = channel_mode == 3;
-			init = false;
-		}
-		
+		set_mpeg_version();
+		set_layer(buffer[1]);
+		set_crc();
+		set_info();
+		set_emphasis(buffer);
+		set_sampling_rate();
+		set_tables();
 		set_channel_mode(buffer);
 		set_mode_extension(buffer);
 		set_padding();
@@ -52,13 +45,13 @@ void mp3::init_frame_params(unsigned char *buffer)
 	set_side_info(&buffer[4]);
 	set_main_data(buffer);
 	for (int gr = 0; gr < 2; gr++) {
-		for (int ch = 0; ch < (mono ? 1 : 2); ch++)
+		for (int ch = 0; ch < channels; ch++)
 			requantize(gr, ch);
 		
-		if (channel_mode == 1 && mode_extension[0])
+		if (channel_mode == JointStereo && mode_extension[0])
 			ms_stereo(gr);
 
-		for (int ch = 0; ch < (mono ? 1 : 2); ch++) {
+		for (int ch = 0; ch < channels; ch++) {
 			if (block_type[gr][ch] == 2 || mixed_block_flag[gr][ch])
 				reorder(gr, ch);
 			else
@@ -238,10 +231,12 @@ bool mp3::get_padding()
  */
 void mp3::set_channel_mode(unsigned char *buffer)
 {
-	channel_mode = buffer[3] >> 6;
+	unsigned value = buffer[3] >> 6;
+	channel_mode = static_cast<ChannelMode>(value);
+	channels = channel_mode == Mono ? 1 : 2;
 }
 
-unsigned mp3::get_channel_mode()
+mp3::ChannelMode mp3::get_channel_mode()
 {
 	return channel_mode;
 }
@@ -263,11 +258,11 @@ unsigned *mp3::get_mode_extension()
 /** Although rarely used, there is no method for emphasis. */
 void mp3::set_emphasis(unsigned char *buffer)
 {
-	emphasis = buffer[3] << 6;
-	emphasis = emphasis >> 6;
+	unsigned value = (buffer[3] << 6) >> 6;
+	emphasis = static_cast<Emphasis>(value);
 }
 
-unsigned mp3::get_emphasis()
+mp3::Emphasis mp3::get_emphasis()
 {
 	return emphasis;
 }
@@ -326,9 +321,9 @@ void mp3::set_side_info(unsigned char *buffer)
 	main_data_begin = (int)get_bits_inc(buffer, &count, 9);
 
 	/* Skip private bits. Not necessary. */
-	count += mono ? 5 : 3;
+	count += channel_mode == Mono ? 5 : 3;
 
-	for (int ch = 0; ch < (mono ? 1 : 2); ch++)
+	for (int ch = 0; ch < channels; ch++)
 		for (int scfsi_band = 0; scfsi_band < 4; scfsi_band++)
 			/* - Scale factor selection information.
 			 * - If scfsi[scfsi_band] == 1, then scale factors for the first
@@ -338,7 +333,7 @@ void mp3::set_side_info(unsigned char *buffer)
 			scfsi[ch][scfsi_band] = get_bits_inc(buffer, &count, 1) != 0;
 
 	for (int gr = 0; gr < 2; gr++)
-		for (int ch = 0; ch < (mono ? 1 : 2); ch++) {
+		for (int ch = 0; ch < channels; ch++) {
 			/* Length of the scaling factors and main data in bits. */
 			part2_3_length[gr][ch] = (int)get_bits_inc(buffer, &count, 12);
 			/* Number of values in each big_region. */
@@ -415,7 +410,7 @@ void mp3::set_side_info(unsigned char *buffer)
 void mp3::set_main_data(unsigned char *buffer)
 {
 	/* header + side_information */
-	int constant = mono ? 21 : 36;
+	int constant = channel_mode == Mono ? 21 : 36;
 	if (crc == 0)
 		constant += 2;
 
@@ -445,7 +440,7 @@ void mp3::set_main_data(unsigned char *buffer)
 
 	int bit = 0;
 	for (int gr = 0; gr < 2; gr++)
-		for (int ch = 0; ch < (mono ? 1 : 2); ch++) {
+		for (int ch = 0; ch < channels; ch++) {
 			int max_bit = bit + part2_3_length[gr][ch];
 			unpack_scalefac(main_data, gr, ch, bit);
 			unpack_samples(main_data, gr, ch, bit, max_bit);
@@ -929,10 +924,9 @@ void mp3::synth_filterbank(int gr, int ch)
 void mp3::interleave()
 {
 	int i = 0;
-	static const int CHANNELS = mono ? 1 : 2;
 	for (int gr = 0; gr < 2; gr++)
 		for (int sample = 0; sample < 576; sample++)
-			for (int ch = 0; ch < CHANNELS; ch++)
+			for (int ch = 0; ch < channels; ch++)
 				pcm[i++] = samples[gr][ch][sample];
 	
 }

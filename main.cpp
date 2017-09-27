@@ -6,7 +6,7 @@
 
 #include <fstream>
 #include <stdio.h>
-#include <alsa/asoundlib.h> /* dnf install alsa-lib-devel */
+#include <alsa/asoundlib.h> /* dnf install alsa-lib-devel */ /* apt install libasound2-dev */
 #include <vector>
 #include "id3.h"
 #include "mp3.h"
@@ -23,7 +23,7 @@
 inline void stream(mp3 &decoder, unsigned char *buffer, unsigned offset)
 {
 	unsigned sampeling_rate = decoder.get_sampling_rate();
-	unsigned channels = decoder.get_channel_mode() == 3 ? 1 : 2;
+	unsigned channels = decoder.get_channel_mode() == mp3::Mono ? 1 : 2;
 	snd_pcm_t *handle;
 	snd_pcm_hw_params_t *hw = NULL;
 	snd_pcm_uframes_t frames = 128;
@@ -106,7 +106,7 @@ int main(int argc, char **argv)
 		printf("No directory specified.\n");
 		return -1;
 	}
-	
+
 	try {
 		unsigned char *buffer = get_file(argv[1]);
 		unsigned offset = 0;
@@ -121,4 +121,3 @@ int main(int argc, char **argv)
 
 	return 0;
 }
-
