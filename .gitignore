@@ -1,3 +1,7 @@
 mp3decoder
+nbproject/
 tests/
-
+test/
+*.mp3
+*.txt
+*.swp

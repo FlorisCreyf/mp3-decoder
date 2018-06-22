@@ -4,7 +4,7 @@
  * Unpacks and decodes frames/headers.
  */
 
-#include <math.h>
+#include <cmath>
 #include "tables.h"
 
 #ifndef MP3_H
@@ -12,30 +12,30 @@
 
 class mp3 {
 public:
-        enum ChannelMode {
+	enum ChannelMode {
 		Stereo = 0,
 		JointStereo = 1,
 		DualChannel = 2,
 		Mono = 3
-        };
+	};
 	enum Emphasis {
 		None = 0,
 		MS5015 = 1,
 		Reserved = 2,
 		CCITJ17 = 3
-        };
-        
+	};
+
 	mp3(unsigned char *buffer);
  	void init_header_params(unsigned char *buffer);
 	void init_frame_params(unsigned char *buffer);
-	
+
 private:
 	unsigned char *buffer;
 	bool valid;
-	
+
 public:
 	bool is_valid();
-	
+
 private: /* Header */
 	float mpeg_version;
 	unsigned layer;
@@ -56,7 +56,7 @@ private: /* Header */
 		const unsigned *long_win;
 		const unsigned *short_win;
 	} band_width;
-	
+
 	void set_mpeg_version();
 	void set_layer(unsigned char byte);
 	void set_crc();
@@ -68,7 +68,7 @@ private: /* Header */
 	void set_emphasis(unsigned char *buffer);
 	void set_info();
 	void set_tables();
-        
+
 public:
 	float get_mpeg_version();
 	unsigned get_layer();
@@ -80,14 +80,15 @@ public:
 	unsigned *get_mode_extension();
 	Emphasis get_emphasis();
 	bool *get_info();
-	
+
 private: /* Frame */
-	int prev_frame_size;
+	static const int num_prev_frames = 9;
+	int prev_frame_size[9];
 	int frame_size;
-	
+
 	int main_data_begin;
 	bool scfsi[2][4];
-	
+
 	/* Allocate space for two granules and two channels. */
 	int part2_3_length[2][2];
 	int part2_length[2][2];
@@ -108,14 +109,16 @@ private: /* Frame */
 	int preflag[2][2];
 	int scalefac_scale[2][2];
 	int count1table_select[2][2];
-	
-	int scalefactor[2][2][39];
+
 	int scalefac_l[2][2][22];
 	int scalefac_s[2][2][3][13];
-	
+
+	float prev_samples[2][32][18];
+	float fifo[2][1024];
+
 	float samples[2][2][576];
 	float pcm[576 * 4];
-	
+
 	void set_frame_size();
 	void set_side_info(unsigned char *buffer);
 	void set_main_data(unsigned char *buffer);
@@ -129,11 +132,10 @@ private: /* Frame */
 	void frequency_inversion(int gr, int ch);
 	void synth_filterbank(int gr, int ch);
 	void interleave();
-	
+
 public:
 	float *get_samples();
 	unsigned get_frame_size();
 };
 
 #endif	/* MP3_H */
-
