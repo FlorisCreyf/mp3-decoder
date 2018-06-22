@@ -302,8 +302,7 @@ void mp3::set_frame_size()
 	/* Minimum frame size = 1152 / 8 * 32000 / 48000 = 96
 	 * Minimum main_data size = 96 - 36 - 2 = 58
 	 * Maximum main_data_begin = 2^9 = 512
-	 * Therefore remember ceil(512 / 58) = 9 previous frames.
-	 */
+	 * Therefore remember ceil(512 / 58) = 9 previous frames. */
 	for (int i = num_prev_frames-1; i > 0; --i)
 		prev_frame_size[i] = prev_frame_size[i-1];
 	prev_frame_size[0] = frame_size;
@@ -426,18 +425,18 @@ void mp3::set_main_data(unsigned char *buffer)
 	 * don't interfere. The main_data_begin may be larger than the previous frame
 	 * and doesn't include the size of side info and headers. */
 	unsigned char *main_data;
-	
-	int bound = 0;
 	if (main_data_begin == 0) {
 		main_data = new unsigned char[frame_size - constant];
 		memcpy(&main_data[main_data_begin], buffer + constant, frame_size - constant);
 	} else {
+		int bound = 0;
 		for (int frame = 0; frame < num_prev_frames; frame++) {
 			bound += prev_frame_size[frame] - constant;
 			if (main_data_begin < bound) {
 				int ptr_offset = main_data_begin + frame * constant;
 				int buffer_offset = 0;
-				int part[9];
+
+				int part[num_prev_frames];
 				part[frame] = main_data_begin;
 				for (int i = 0; i <= frame-1; i++) {
 					part[i] = prev_frame_size[i] - constant;
@@ -467,7 +466,7 @@ void mp3::set_main_data(unsigned char *buffer)
 			unpack_samples(main_data, gr, ch, bit, max_bit);
 			bit = max_bit;
 		}
-	
+
 	delete[] main_data;
 }
 
@@ -701,9 +700,9 @@ void mp3::requantize(int gr, int ch)
 		}
 
 		float sign = samples[gr][ch][sample] < 0 ? -1.0f : 1.0f;
-		float a = pow(std::abs(samples[gr][ch][sample]), 4.0 / 3.0);
-		float b = pow(2.0, exp1 / 4.0);
-		float c = pow(2.0, -exp2);
+		float a = std::pow(std::abs(samples[gr][ch][sample]), 4.0 / 3.0);
+		float b = std::pow(2.0, exp1 / 4.0);
+		float c = std::pow(2.0, -exp2);
 
 		samples[gr][ch][sample] = sign * a * b * c;
 	}
@@ -722,12 +721,12 @@ void mp3::reorder(int gr, int ch)
 	float samples[576] = {0};
 
 	for (int sb = 0; sb < 12; sb++) {
-		const int SB_WIDTH = band_width.short_win[sb];
+		const int sb_width = band_width.short_win[sb];
 
-		for (int ss = 0; ss < SB_WIDTH; ss++) {
-			samples[start + block + 0] = this->samples[gr][ch][total + ss + SB_WIDTH * 0];
-			samples[start + block + 6] = this->samples[gr][ch][total + ss + SB_WIDTH * 1];
-			samples[start + block + 12] = this->samples[gr][ch][total + ss + SB_WIDTH * 2];
+		for (int ss = 0; ss < sb_width; ss++) {
+			samples[start + block + 0] = this->samples[gr][ch][total + ss + sb_width * 0];
+			samples[start + block + 6] = this->samples[gr][ch][total + ss + sb_width * 1];
+			samples[start + block + 12] = this->samples[gr][ch][total + ss + sb_width * 2];
 
 			if (block != 0 && block % 5 == 0) { /* 6 * 3 = 18 */
 				start += 18;
@@ -736,7 +735,7 @@ void mp3::reorder(int gr, int ch)
 				block++;
 		}
 
-		total += SB_WIDTH * 3;
+		total += sb_width * 3;
 	}
 
 	for (int i = 0; i < 576; i++)
@@ -802,43 +801,43 @@ void mp3::imdct(int gr, int ch)
 	if (init) {
 		int i;
 		for (i = 0; i < 36; i++)
-			sine_block[0][i] = sin(PI / 36.0 * (i + 0.5));
+			sine_block[0][i] = std::sin(PI / 36.0 * (i + 0.5));
 		for (i = 0; i < 18; i++)
-			sine_block[1][i] = sin(PI / 36.0 * (i + 0.5));
+			sine_block[1][i] = std::sin(PI / 36.0 * (i + 0.5));
 		for (; i < 24; i++)
 			sine_block[1][i] = 1.0;
 		for (; i < 30; i++)
-			sine_block[1][i] = sin(PI / 12.0 * (i - 18.0 + 0.5));
+			sine_block[1][i] = std::sin(PI / 12.0 * (i - 18.0 + 0.5));
 		for (; i < 36; i++)
 			sine_block[1][i] = 0.0;
 		for (i = 0; i < 12; i++)
-			sine_block[2][i] = sin(PI / 12.0 * (i + 0.5));
+			sine_block[2][i] = std::sin(PI / 12.0 * (i + 0.5));
 		for (i = 0; i < 6; i++)
 			sine_block[3][i] = 0.0;
 		for (; i < 12; i++)
-			sine_block[3][i] = sin(PI / 12.0 * (i - 6.0 + 0.5));
+			sine_block[3][i] = std::sin(PI / 12.0 * (i - 6.0 + 0.5));
 		for (; i < 18; i++)
 			sine_block[3][i] = 1.0;
 		for (; i < 36; i++)
-			sine_block[3][i] = sin(PI / 36.0 * (i + 0.5));
+			sine_block[3][i] = std::sin(PI / 36.0 * (i + 0.5));
 		init = false;
 	}
 
-	const int N = block_type[gr][ch] == 2 ? 12 : 36;
-	const int HALF_N = N / 2;
+	const int n = block_type[gr][ch] == 2 ? 12 : 36;
+	const int half_n = n / 2;
 	int sample = 0;
 
 	for (int block = 0; block < 32; block++) {
 		for (int win = 0; win < (block_type[gr][ch] == 2 ? 3 : 1); win++) {
-			for (int i = 0; i < N; i++) {
+			for (int i = 0; i < n; i++) {
 				float xi = 0.0;
-				for (int k = 0; k < HALF_N; k++) {
-					float s = samples[gr][ch][18 * block + HALF_N * win + k];
-					xi += s * cos(PI / (2 * N) * (2 * i + 1 + HALF_N) * (2 * k + 1));
+				for (int k = 0; k < half_n; k++) {
+					float s = samples[gr][ch][18 * block + half_n * win + k];
+					xi += s * std::cos(PI / (2 * n) * (2 * i + 1 + half_n) * (2 * k + 1));
 				}
 
 				/* Windowing samples. */
-				sample_block[win * N + i] = xi * sine_block[block_type[gr][ch]][i];
+				sample_block[win * n + i] = xi * sine_block[block_type[gr][ch]][i];
 			}
 		}
 
@@ -887,22 +886,22 @@ void mp3::frequency_inversion(int gr, int ch)
  */
 void mp3::synth_filterbank(int gr, int ch)
 {
-	static float N[64][32];
+	static float n[64][32];
 	static bool init = true;
 
 	if (init) {
 		init = false;
 		for (int i = 0; i < 64; i++)
 			for (int j = 0; j < 32; j++)
-				N[i][j] = cos((16.0 + i) * (2.0 * j + 1.0) * (PI / 64.0));
+				n[i][j] = std::cos((16.0 + i) * (2.0 * j + 1.0) * (PI / 64.0));
 	}
 
-	float S[32], U[512], W[512];
+	float s[32], u[512], w[512];
 	float pcm[576];
 
 	for (int sb = 0; sb < 18; sb++) {
 		for (int i = 0; i < 32; i++)
-			S[i] = samples[gr][ch][i * 18 + sb];
+			s[i] = samples[gr][ch][i * 18 + sb];
 
 		for (int i = 1023; i > 63; i--)
 			fifo[ch][i] = fifo[ch][i - 64];
@@ -910,22 +909,22 @@ void mp3::synth_filterbank(int gr, int ch)
 		for (int i = 0; i < 64; i++) {
 			fifo[ch][i] = 0.0;
 			for (int j = 0; j < 32; j++)
-				fifo[ch][i] += S[j] * N[i][j];
+				fifo[ch][i] += s[j] * n[i][j];
 		}
 
 		for (int i = 0; i < 8; i++)
 			for (int j = 0; j < 32; j++) {
-				U[i * 64 + j] = fifo[ch][i * 128 + j];
-				U[i * 64 + j + 32] = fifo[ch][i * 128 + j + 96];
+				u[i * 64 + j] = fifo[ch][i * 128 + j];
+				u[i * 64 + j + 32] = fifo[ch][i * 128 + j + 96];
 			}
 
 		for (int i = 0; i < 512; i++)
-			W[i] = U[i] * synth_window[i];
+			w[i] = u[i] * synth_window[i];
 
 		for (int i = 0; i < 32; i++) {
 			float sum = 0;
 			for (int j = 0; j < 16; j++)
-				sum += W[j * 32 + i];
+				sum += w[j * 32 + i];
 			pcm[32 * sb + i] = sum;
 		}
 	}

@@ -16,7 +16,7 @@ xing::xing(unsigned char *buffer, unsigned int offset)
 	/* The position of the Xing header within the first MP3 frame is unknown. */
 	while (true) {
 		if (buffer[offset] == 'I' || buffer[offset] == 'X') {
-			for (int byte = 0; byte < 4; byte++) 
+			for (int byte = 0; byte < 4; byte++)
 				id += buffer[offset + byte];
 
 			if (id == "Info" || id == "Xing") {
@@ -54,11 +54,11 @@ void xing::set_xing_extensions(unsigned char* buffer, unsigned int offset)
 			this->xing_extensions[bit_num] = true;
 		else
 			this->xing_extensions[bit_num] = false;
-	
+
 	this->start += 4;
 }
 
-bool *xing::get_xing_extensions()
+const bool *xing::get_xing_extensions()
 {
 	return this->xing_extensions;
 }
@@ -87,7 +87,7 @@ int xing::get_byte_quantity()
 
 void xing::set_quality(unsigned char *buffer)
 {
-	unsigned char size = (this->xing_extensions[XING_EXT_TOC] == true ? 100 : 0);
+	unsigned char size = (this->xing_extensions[TOC] == true ? 100 : 0);
 	this->quality = buffer[this->start + size + this->field_num*4 + 3];
 }
 
@@ -95,4 +95,3 @@ unsigned char xing::get_quality()
 {
 	return this->quality;
 }
-

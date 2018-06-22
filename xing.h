@@ -8,21 +8,11 @@
 #ifndef XING_H
 #define XING_H
 
-#define XING_EXT_FRAME_FIELD 0
-#define XING_EXT_BYTE_FIELD  1
-#define XING_EXT_TOC         2
-#define XING_EXT_QUALITY     3
-
 class xing {
 private:
 	unsigned int start;
 	unsigned char field_num = 0;
 
-	/* Values:
-	 * 0 -> Frame field.
-	 * 1 -> Byte field.
-	 * 2 -> TOC (table of contents).
-	 * 3 -> Quality indicator. */
 	bool xing_extensions[4];
 	int byte_quantity;
 	int frame_quantity;
@@ -36,10 +26,17 @@ private:
 	void set_quality(unsigned char *buffer);
 
 public:
+	enum Extension {
+		FrameField = 0,
+		ByteField = 1,
+		TOC = 2,
+		Quality = 3
+	};
+
 	xing(unsigned char *buffer, unsigned int offset);
 	xing(const xing &orig);
 
-	bool *get_xing_extensions();
+	const bool *get_xing_extensions();
 	int get_byte_quantity();
 	int get_frame_quantity();
 
@@ -48,5 +45,3 @@ public:
 };
 
 #endif	/* XING_H */
-
-

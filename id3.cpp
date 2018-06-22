@@ -13,7 +13,7 @@
 id3::id3(unsigned char *buffer)
 {
 	this->buffer = buffer;
-	
+
 	if (buffer[0] == 'I' && buffer[1] == 'D' && buffer[2] == '3') {
 		set_version(buffer[3], buffer[4]);
 		if(set_flags(buffer[5])) {
@@ -82,14 +82,14 @@ bool id3::set_flags(unsigned char flags)
 	return true;
 }
 
-bool *id3::get_id3_flags()
+const bool *id3::get_id3_flags()
 {
 	return this->id3_flags;
 }
 
 void id3::set_extended_header_size(int size)
 {
-	if (this->id3_flags[ID3_FLAG_EXTENDED_HEADER] == 1)
+	if (this->id3_flags[ExtendedHeader] == 1)
 		this->extended_header_size = size;
 	else
 		this->extended_header_size = 0;
@@ -102,7 +102,7 @@ int id3::get_id3_extended_header_size()
 
 void id3::set_fields(unsigned char *buffer)
 {
-	int footer_size = id3_flags[ID3_FLAG_FOOTER_PRESENT] * 10;
+	int footer_size = id3_flags[FooterPresent] * 10;
 	int size = offset - extended_header_size - footer_size;
 	int i = 0;
 
@@ -129,7 +129,7 @@ void id3::set_fields(unsigned char *buffer)
 	}
 }
 
-vector<string> *id3::get_id3_fields()
+const vector<string> *id3::get_id3_fields()
 {
 	return this->id3_frames;
 }
@@ -138,4 +138,3 @@ unsigned int id3::get_id3_fields_length()
 {
 	return this->id3_frames[1].size();
 }
-

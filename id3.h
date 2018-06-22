@@ -16,11 +16,6 @@ using std::vector;
 #ifndef ID3_H
 #define ID3_H
 
-#define ID3_FLAG_FOOTER_PRESENT         0
-#define ID3_FLAG_EXPERIMENTAL_INDICATOR 1
-#define ID3_FLAG_EXTENDED_HEADER        2
-#define ID3_FLAG_UNSYNCHRONISATION      3
-
 class id3 {
 private:
 	unsigned char *buffer;
@@ -39,17 +34,23 @@ private:
 	void set_fields(unsigned char *buffer);
 
 public:
+	enum Flags {
+		FooterPresent = 0,
+		ExperimentalIndicator = 1,
+		ExtendedHeader = 2,
+		Unsynchronisation = 3
+	};
+
 	id3(unsigned char *buffer);
 	id3(const id3 &orig);
-	
+
 	bool is_valid();
 	string get_id3_version();
-	bool *get_id3_flags();
+	const bool *get_id3_flags();
 	int get_id3_offset();
 	int get_id3_extended_header_size();
-	vector<string> *get_id3_fields();
+	const vector<string> *get_id3_fields();
 	unsigned int get_id3_fields_length();
 };
 
 #endif	/* ID3_H */
-
