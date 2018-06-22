@@ -9,7 +9,6 @@
 /**
  * Assumes that end_bit is greater than start_bit and that the result is less than
  * 32 bits, length of an unsigned type.
- * TODO Could function a bit more efficiently.
  * @param buffer
  * @param start_bit
  * @param end_bit
@@ -29,4 +28,3 @@ unsigned get_bits_inc(unsigned char *buffer, int *offset, int count);
 int char_to_int(unsigned char *buffer);
 
 #endif	/* UTIL_H */
-
