@@ -5,6 +5,7 @@
  */
 
 #include <cmath>
+#include <vector>
 #include "tables.h"
 
 #ifndef MP3_H
@@ -116,6 +117,7 @@ private: /* Frame */
 	float prev_samples[2][32][18];
 	float fifo[2][1024];
 
+	std::vector<unsigned char> main_data;
 	float samples[2][2][576];
 	float pcm[576 * 4];
 
@@ -136,6 +138,7 @@ private: /* Frame */
 public:
 	float *get_samples();
 	unsigned get_frame_size();
+	unsigned get_header_size();
 };
 
 #endif	/* MP3_H */

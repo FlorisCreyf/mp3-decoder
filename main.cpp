@@ -20,7 +20,7 @@
  * @param buffer A buffer containing the MP3 bit stream.
  * @param offset An offset to a MP3 frame header.
  */
-inline void stream(mp3 &decoder, unsigned char *buffer, unsigned offset)
+inline void stream(mp3 &decoder, std::vector<unsigned char> &buffer, unsigned offset)
 {
 	unsigned sampeling_rate = decoder.get_sampling_rate();
 	unsigned channels = decoder.get_channel_mode() == mp3::Mono ? 1 : 2;
@@ -52,7 +52,7 @@ inline void stream(mp3 &decoder, unsigned char *buffer, unsigned offset)
 		exit(1);
 
 	/* Start decoding. */
-	while (decoder.is_valid()) {
+	while (decoder.is_valid() && buffer.size() > offset + decoder.get_header_size()) {
 		decoder.init_header_params(&buffer[offset]);
 		if (decoder.is_valid()) {
 			decoder.init_frame_params(&buffer[offset]);
@@ -68,19 +68,17 @@ inline void stream(mp3 &decoder, unsigned char *buffer, unsigned offset)
 	snd_pcm_close(handle);
 }
 
-unsigned char *get_file(const char *dir)
+std::vector<unsigned char> get_file(const char *dir)
 {
-	std::ifstream file(dir, std::ios::in | std::ios::binary);
-	file.seekg(0, file.end);
-	int len = file.tellg();
-	file.seekg(0, file.beg);
-	char *buffer = new char[len];
-	file.read(buffer, len);
+	std::ifstream file(dir, std::ios::in | std::ios::binary | std::ios::ate);
+	std::vector<unsigned char> buffer(file.tellg());
+	file.seekg(0, std::ios::beg);
+	file.read((char *)buffer.data(), buffer.size());
 	file.close();
-	return reinterpret_cast<unsigned char *>(buffer);
+	return std::move(buffer);
 }
 
-std::vector<id3> get_id3_tags(unsigned char *buffer, unsigned &offset)
+std::vector<id3> get_id3_tags(std::vector<unsigned char> &buffer, unsigned &offset)
 {
 	std::vector<id3> tags;
 	int i = 0;
@@ -108,12 +106,11 @@ int main(int argc, char **argv)
 	}
 
 	try {
-		unsigned char *buffer = get_file(argv[1]);
+		std::vector<unsigned char> buffer = get_file(argv[1]);
 		unsigned offset = 0;
 		std::vector<id3> tags = get_id3_tags(buffer, offset);
 		mp3 decoder(&buffer[offset]);
 		stream(decoder, buffer, offset);
-		delete buffer;
 	} catch (std::bad_alloc) {
 		printf("File does not exist.\n");
 		return -1;

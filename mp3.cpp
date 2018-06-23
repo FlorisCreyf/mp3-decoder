@@ -316,6 +316,11 @@ unsigned mp3::get_frame_size()
 	return frame_size;
 }
 
+unsigned mp3::get_header_size()
+{
+	return 4;
+}
+
 /**
  * The side information contains information on how to decode the main_data.
  * @param buffer A pointer to the first byte of the side info.
@@ -424,10 +429,9 @@ void mp3::set_main_data(unsigned char *buffer)
 	/* Let's put the main data in a separate buffer so that side info and header
 	 * don't interfere. The main_data_begin may be larger than the previous frame
 	 * and doesn't include the size of side info and headers. */
-	unsigned char *main_data;
 	if (main_data_begin == 0) {
-		main_data = new unsigned char[frame_size - constant];
-		memcpy(&main_data[main_data_begin], buffer + constant, frame_size - constant);
+		main_data.resize(frame_size - constant);
+		memcpy(&main_data[0], buffer + constant, frame_size - constant);
 	} else {
 		int bound = 0;
 		for (int frame = 0; frame < num_prev_frames; frame++) {
@@ -443,8 +447,8 @@ void mp3::set_main_data(unsigned char *buffer)
 					part[frame] -= part[i];
 				}
 
-				main_data = new unsigned char[frame_size + main_data_begin];
-				memcpy(main_data, buffer - ptr_offset, part[frame]);
+				main_data.resize(frame_size - constant + main_data_begin);
+				memcpy(main_data.data(), buffer - ptr_offset, part[frame]);
 				ptr_offset -= (part[frame] + constant);
 				buffer_offset += part[frame];
 				for (int i = frame-1; i >= 0; i--) {
@@ -462,12 +466,10 @@ void mp3::set_main_data(unsigned char *buffer)
 	for (int gr = 0; gr < 2; gr++)
 		for (int ch = 0; ch < channels; ch++) {
 			int max_bit = bit + part2_3_length[gr][ch];
-			unpack_scalefac(main_data, gr, ch, bit);
-			unpack_samples(main_data, gr, ch, bit, max_bit);
+			unpack_scalefac(main_data.data(), gr, ch, bit);
+			unpack_samples(main_data.data(), gr, ch, bit, max_bit);
 			bit = max_bit;
 		}
-
-	delete[] main_data;
 }
 
 /**
