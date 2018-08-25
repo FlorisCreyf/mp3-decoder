@@ -107,8 +107,9 @@ void id3::set_fields(unsigned char *buffer)
 	int i = 0;
 
 	std::regex re("[A-Z0-9]");
+	string str(1, (char)buffer[i]);
 
-	while (!std::regex_match((string){(char)buffer[i]}, re) && i < size) {
+	while (!std::regex_match(str, re) && i < size) {
 		string id = "";
 		string content = "";
 		int field_size = 0;
@@ -126,6 +127,7 @@ void id3::set_fields(unsigned char *buffer)
 		this->id3_frames[1].push_back(content);
 
 		i += field_size;
+		str = (char)buffer[i];
 	}
 }
 
