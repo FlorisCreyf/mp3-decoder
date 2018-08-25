@@ -6,15 +6,15 @@
  * | Header | Additional header (optional) | Meta Data | Footer (optional) |
  */
 
+#ifndef ID3_H
+#define ID3_H
+
 #include <string>
 #include <vector>
 #include <stdio.h>
 
 using std::string;
 using std::vector;
-
-#ifndef ID3_H
-#define ID3_H
 
 class id3 {
 private:

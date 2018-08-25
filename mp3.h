@@ -4,12 +4,12 @@
  * Unpacks and decodes frames/headers.
  */
 
+#ifndef MP3_H
+#define MP3_H
+
 #include <cmath>
 #include <vector>
 #include "tables.h"
-
-#ifndef MP3_H
-#define MP3_H
 
 class mp3 {
 public:
