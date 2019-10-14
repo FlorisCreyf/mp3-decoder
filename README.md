@@ -8,7 +8,7 @@ An unoptimized floating point decoder for MPEG-1 Layer 3.
 2. Ignores XING or INFO tags.
 3. Ignores ID3v1 entirely.
 
-I wrote a summary titled [MP3 Decoding in C++](http://www.fcreyf.com/11114/mp3-decoding-in-c++), although the source should be fairly straightforward. Feel free to make suggestions, fork, or whatever.
+I wrote a summary titled [MP3 Decoding in C++](https://www.fcreyf.com/article/mp3-decoding-in-c++), although the source should be fairly straightforward. Feel free to make suggestions, fork, or whatever.
 
 ## Development
 
