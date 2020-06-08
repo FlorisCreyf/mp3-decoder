@@ -7,7 +7,7 @@
 #ifndef TABLES_H
 #define	TABLES_H
 
-struct {
+static const struct {
 	const unsigned long_32[22] {
 		4, 4, 4, 4, 4, 4, 6, 6, 8, 10, 12, 16, 20, 24, 30, 38, 46, 56, 68, 84, 102
 	};
@@ -28,7 +28,7 @@ struct {
 	};
 } band_width_table;
 
-struct {
+static const struct {
 	const unsigned long_32[23] {
 		0, 4, 8, 12, 16, 20, 24, 30, 36, 44, 54, 66, 82,
 		102, 126, 156, 194, 240, 296, 364, 448, 550, 576
@@ -61,7 +61,7 @@ static const char pretab[21] {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 3, 2
 };
 
-struct {
+static const struct {
 	const unsigned char value[16][4] {
 		{0, 0, 0, 0}, {0, 0, 0, 1}, {0, 0, 1, 0}, {0, 0, 1, 1}, {0, 1, 0, 0}, {0, 1, 0, 1},
 		{0, 1, 1, 0}, {0, 1, 1, 1}, {1, 0, 0, 0}, {1, 0, 0, 1}, {1, 0, 1, 0}, {1, 0, 1, 1},

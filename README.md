@@ -18,4 +18,4 @@ Determining correct output is straightforward. Either the PCM or configuration i
 
 ## Licencing
 
-This project is a form of speech. Actually converging the source into a working program might require the purchase of a patent license. A compiled version of this project wouldn't be very suitable in real world applications, considering that there are plenty of better and optimized options like MAD.
+Compiling the source into a working program might require the purchase of a patent license. A compiled version of this project wouldn't be very suitable in real world applications, considering that there are plenty of better and optimized options like MAD.

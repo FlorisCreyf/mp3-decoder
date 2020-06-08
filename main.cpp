@@ -16,13 +16,13 @@
 
 /**
  * Start decoding the MP3 and let ALSA hand the PCM stream over to a driver.
- * @param mp3_decode
+ * @param decoder
  * @param buffer A buffer containing the MP3 bit stream.
  * @param offset An offset to a MP3 frame header.
  */
 inline void stream(mp3 &decoder, std::vector<unsigned char> &buffer, unsigned offset)
 {
-	unsigned sampeling_rate = decoder.get_sampling_rate();
+	unsigned sampling_rate = decoder.get_sampling_rate();
 	unsigned channels = decoder.get_channel_mode() == mp3::Mono ? 1 : 2;
 	snd_pcm_t *handle;
 	snd_pcm_hw_params_t *hw = NULL;
@@ -40,7 +40,7 @@ inline void stream(mp3 &decoder, std::vector<unsigned char> &buffer, unsigned of
 		exit(1);
 	if (snd_pcm_hw_params_set_channels(handle, hw, channels) < 0)
 		exit(1);
-	if (snd_pcm_hw_params_set_rate_near(handle, hw, &sampeling_rate, NULL) < 0)
+	if (snd_pcm_hw_params_set_rate_near(handle, hw, &sampling_rate, NULL) < 0)
 		exit(1);
 	if (snd_pcm_hw_params_set_period_size_near(handle, hw, &frames, NULL) < 0)
 		exit(1);
@@ -48,7 +48,7 @@ inline void stream(mp3 &decoder, std::vector<unsigned char> &buffer, unsigned of
 		exit(1);
 	if (snd_pcm_hw_params_get_period_size(hw, &frames, NULL) < 0)
 		exit(1);
-	if (snd_pcm_hw_params_get_period_time(hw, &sampeling_rate, NULL) < 0)
+	if (snd_pcm_hw_params_get_period_time(hw, &sampling_rate, NULL) < 0)
 		exit(1);
 
 	/* Start decoding. */
