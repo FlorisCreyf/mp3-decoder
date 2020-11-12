@@ -52,7 +52,7 @@ void mp3::init_header_params(unsigned char *buffer)
  */
 void mp3::init_frame_params(unsigned char *buffer)
 {
-	set_side_info(&buffer[4]);
+	set_side_info(&buffer[crc == 0 ? 6 : 4]);
 	set_main_data(buffer);
 	for (int gr = 0; gr < 2; gr++) {
 		for (int ch = 0; ch < channels; ch++)
@@ -599,9 +599,6 @@ void mp3::unpack_samples(unsigned char *main_data, int gr, int ch, int bit, int 
 				int i = 2 * big_value_max[table_num] * row + 2 * col;
 				unsigned value = table[i];
 				unsigned size = table[i + 1];
-
-				/* TODO Need to update tables so that we can simply write:
-				 *      value == bit_sample >> (32 - size) */
 				if (value >> (32 - size) == bit_sample >> (32 - size)) {
 					bit += size;
 
